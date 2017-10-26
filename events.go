@@ -92,7 +92,7 @@ func (e *Event) Emit(args ...interface{}) *Event {
 	e.Lock()
 	defer e.Unlock()
 	for _, v := range e.listeners {
-		go v.fn(args...)
+		v.fn(args...)
 		if !v.once {
 			listeners = append(listeners, v)
 		}
