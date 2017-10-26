@@ -2,16 +2,19 @@ package events
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 // Event emitter
 type Event struct {
+	currID uint64
 	sync.Mutex
 	listeners []*Listener
 }
 
 // Listener instance
 type Listener struct {
+	id     uint64
 	fn     func(...interface{})
 	once   bool
 	parent *Event
@@ -33,7 +36,7 @@ func (l *Listener) Remove() {
 }
 
 func (e *Event) addListener(fn func(...interface{}), once bool) (listener *Listener) {
-	listener = &Listener{fn: fn, once: once, parent: e}
+	listener = &Listener{id: atomic.AddUint64(&e.currID, 1), fn: fn, once: once, parent: e}
 	e.Lock()
 	defer e.Unlock()
 	e.listeners = append(e.listeners, listener)
@@ -54,15 +57,17 @@ func (e *Event) Once(fn func(...interface{})) (listener *Listener) {
 
 // RemoveListener - remove event's listener
 func (e *Event) RemoveListener(l *Listener) *Event {
-	listeners := []*Listener{}
 	e.Lock()
 	defer e.Unlock()
-	for _, v := range e.listeners {
-		if v != l {
-			listeners = append(listeners, v)
+	for i, v := range e.listeners {
+		if v.id == l.id {
+			// delete without preserving order
+			e.listeners[i] = e.listeners[len(e.listeners)-1]
+			e.listeners = e.listeners[:len(e.listeners)-1]
+			break
 		}
 	}
-	e.listeners = listeners
+
 	return e
 }
 
